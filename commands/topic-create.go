@@ -1,12 +1,14 @@
 package commands
 
 import (
+	"fmt"
+	"log"
+
 	"../config"
 	"../git"
-	"code.google.com/p/goauth2/oauth"
-	"fmt"
+	gh "../github"
+
 	"github.com/google/go-github/github"
-	"log"
 )
 
 type TopicCreateOpts struct {
@@ -37,19 +39,15 @@ func TopicCreate(args []string, conf config.ConfData) (string, error) {
 func (tc *TopicCreateOpts) Exec() (string, error) {
 	git := &git.Git{WorkDir: tc.Config.GitWorkDir}
 
-	token, err := git.FetchAccessToken("gopher.token")
-	if err != nil {
-		return "", err
-	}
 	owner, repo, err := git.FetchOwnerAndRepo()
 	if err != nil {
 		return "", err
 	}
 
-	t := &oauth.Transport{
-		Token: &oauth.Token{AccessToken: token},
+	client, err := gh.New(tc.Config)
+	if err != nil {
+		return "", err
 	}
-	client := github.NewClient(t.Client())
 
 	if _, err := git.Fetch(); err != nil {
 		return "", err
@@ -65,7 +63,7 @@ func (tc *TopicCreateOpts) Exec() (string, error) {
 
 	labels := tc.Config.PullRequestLabels
 
-	if err := tc.createAndPullRequest(git, client, &TopicCreateRequest{
+	if err := tc.createAndPullRequest(git, client.Client, &TopicCreateRequest{
 		Owner: owner,
 		Repo:  repo,
 		Base:  "master",
@@ -76,7 +74,7 @@ func (tc *TopicCreateOpts) Exec() (string, error) {
 		return "", err
 	}
 
-	if err := tc.createAndPullRequest(git, client, &TopicCreateRequest{
+	if err := tc.createAndPullRequest(git, client.Client, &TopicCreateRequest{
 		Owner: owner,
 		Repo:  repo,
 		Base:  tc.baseBranchName(),
@@ -91,7 +89,7 @@ func (tc *TopicCreateOpts) Exec() (string, error) {
 		return "", err
 	}
 
-	if err := tc.createAndPullRequest(git, client, &TopicCreateRequest{
+	if err := tc.createAndPullRequest(git, client.Client, &TopicCreateRequest{
 		Owner: owner,
 		Repo:  repo,
 		Base:  tc.baseBranchName(),

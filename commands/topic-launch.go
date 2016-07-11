@@ -1,22 +1,24 @@
 package commands
 
 import (
-	"../config"
-	"../git"
-	"../github"
-	"../mirage"
 	"fmt"
 	"strconv"
 	"time"
+
+	"../config"
+	"../git"
+	"../github"
 )
 
 type TopicLaunchOpts struct {
 	Subdomain   string
 	IssueNumber int
 	Config      config.ConfData
+	Launcher    string
+	ExtraArgs   []string
 }
 
-func TopicLaunch(args []string, conf config.ConfData) (string, error) {
+func TopicLaunch(args []string, conf config.ConfData, launcher string) (string, error) {
 	if len(args) < 2 {
 		return "", fmt.Errorf("not enough argument")
 	}
@@ -26,7 +28,15 @@ func TopicLaunch(args []string, conf config.ConfData) (string, error) {
 		return "", err
 	}
 
-	tl := &TopicLaunchOpts{Subdomain: args[0], IssueNumber: number, Config: conf}
+	tl := &TopicLaunchOpts{
+		Subdomain:   args[0],
+		IssueNumber: number,
+		Config:      conf,
+		Launcher:    launcher,
+	}
+	if len(args) > 2 {
+		tl.ExtraArgs = args[2:]
+	}
 	return tl.Exec()
 }
 
@@ -76,10 +86,13 @@ func (tl *TopicLaunchOpts) Exec() (string, error) {
 
 	git.PushRemote(deployRefName)
 
-	mirage := &mirage.Mirage{Subdomain: tl.Subdomain, BranchName: deployRefName, Url: tl.Config.MirageUrl, DockerImage: tl.Config.DockerImage}
-	if _, err := mirage.Launch(); err != nil {
-		return "", err
+	lo := &LaunchOpts{
+		Subdomain:  tl.Subdomain,
+		BranchName: deployRefName,
+		Config:     tl.Config,
+		Launcher:   tl.Launcher,
+		ExtraArgs:  tl.ExtraArgs,
 	}
 
-	return fmt.Sprintf("ʕ ◔ϖ◔ʔ < %s に %s で環境作成依頼をだしたよ！", tl.Subdomain, deployRefName), nil
+	return lo.Exec()
 }
